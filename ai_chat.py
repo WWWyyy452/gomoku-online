@@ -7,8 +7,7 @@
 import json
 import os
 import random
-import urllib.request
-import urllib.error
+import subprocess
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "ai_config.json")
 
@@ -119,14 +118,20 @@ def generate_commentary(board, last_move, player, move_count, personality_desc):
     }
 
     try:
-        req = urllib.request.Request(
+        # 使用 curl 调用（urllib 对该 API 的 POST 不稳定）
+        cmd = [
+            "curl", "-s", "-X", "POST",
             f"{base_url}/chat/completions",
-            data=json.dumps(payload).encode("utf-8"),
-            headers=headers,
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
+            "-H", "Content-Type: application/json",
+            "-H", f"Authorization: Bearer {api_key}",
+            "-d", json.dumps(payload, ensure_ascii=False),
+            "--max-time", "15",
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+        if proc.returncode != 0:
+            print(f"[AI-CHAT] curl 失败: {proc.stderr[:100]}")
+            return None
+        result = json.loads(proc.stdout)
 
         message = result.get("choices", [{}])[0].get("message", {})
 
@@ -145,7 +150,7 @@ def generate_commentary(board, last_move, player, move_count, personality_desc):
             return text
         return None
 
-    except (urllib.error.URLError, urllib.error.HTTPError, KeyError, IndexError, json.JSONDecodeError) as e:
+    except (KeyError, IndexError, json.JSONDecodeError, subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
         print(f"[AI-CHAT] 评语生成失败: {e}")
         return None
 
