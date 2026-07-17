@@ -161,8 +161,8 @@ def generate_commentary(board, last_move, player, move_count, personality_desc):
         f"当前棋盘（{stage}，第{move_count}手）：\n{board_text}\n\n"
         f"刚刚 {player_name} 落子于 ({r},{c})。\n"
         f"局势：{situation}\n"
-        f"请用{personality_desc}\n"
-        f"要求：只输出一句嘲讽，不要解释，不要加引号，15字以内，要有攻击性。"
+        f"{personality_desc}\n"
+        f"要求：只输出一句嘲讽，不要解释，不要加引号，20字以内，要够毒舌够扎心。"
     )
 
     # 加入热梗提示
@@ -174,7 +174,7 @@ def generate_commentary(board, last_move, player, move_count, personality_desc):
     payload = {
         "model": model,
         "messages": [
-            {"role": "system", "content": "你是五子棋解说员，只用一句话点评。"},
+            {"role": "system", "content": "你是五子棋毒舌嘲讽大师，你的任务是用一句话把对手嘲讽到体无完肤、怀疑人生。不要留情，不要客气，往死里怼。输出纯嘲讽文本，不要引号，不要解释。"},
             {"role": "user", "content": user_msg},
         ],
         "temperature": temperature,
