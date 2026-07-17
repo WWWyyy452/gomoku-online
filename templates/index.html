@@ -35,6 +35,12 @@ canvas#fx{position:absolute;pointer-events:none;top:50%;left:50%;transform:trans
 .history-list .h-item{display:flex;justify-content:space-between}
 .history-list .h-num{color:#4682c8;font-weight:600}
 .history-list .h-pos{font-family:consolas,monospace}
+/* AI 评语区域 */
+.commentary-area{margin:10px 0;animation:fadeInUp .4s ease-out}
+.commentary-tag{display:inline-block;font-size:11px;font-weight:600;color:#fff;background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:2px 10px;border-radius:10px;margin-bottom:6px}
+.commentary-bubble{background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(139,92,246,0.08));border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:10px 12px;font-size:13px;color:#4c3a6e;line-height:1.5;position:relative}
+.commentary-bubble::before{content:'';position:absolute;top:-6px;left:16px;width:10px;height:10px;background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(139,92,246,0.08));border-left:1px solid rgba(99,102,241,0.2);border-top:1px solid rgba(99,102,241,0.2);transform:rotate(45deg)}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .btn{display:block;width:100%;padding:11px 0;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;transition:all .15s}
 .btn:active{transform:scale(0.96)}
 .btn-primary{background:var(--btn);color:#fff}
@@ -80,7 +86,7 @@ canvas#fx{position:absolute;pointer-events:none;top:50%;left:50%;transform:trans
   #sidebar{width:100%;flex-direction:row;flex-wrap:wrap;border-left:none;border-top:2px solid #c8b89b;padding:10px;align-items:center;gap:8px}
   #sidebar .status-text{font-size:15px;margin-bottom:0}
   #sidebar .btn{width:auto;padding:8px 14px;font-size:13px;margin-bottom:0}
-  #sidebar .spacer,#sidebar .history-area{display:none}
+  #sidebar .spacer,#sidebar .history-area,#sidebar .commentary-area{display:none}
 }
 </style>
 </head>
@@ -100,6 +106,10 @@ canvas#fx{position:absolute;pointer-events:none;top:50%;left:50%;transform:trans
       <div class="stone-indicator black" id="stone-indicator" style="display:none"></div>
       <div class="move-info" id="move-info">步数: 0</div>
       <div id="online-info" class="online-info"></div>
+      <div id="commentary-area" class="commentary-area" style="display:none">
+        <div class="commentary-tag" id="commentary-tag">解说</div>
+        <div class="commentary-bubble" id="commentary-bubble"></div>
+      </div>
       <div class="history-area" id="history-area" style="display:none">
         <div class="history-title">落子记录</div>
         <div class="history-list" id="history-list"></div>
@@ -543,6 +553,25 @@ function updateHistory() {
   list.scrollTop = list.scrollHeight;
 }
 
+// ═══ AI 评语 ═══
+let commentaryTimer = null;
+function showCommentary(personality, text) {
+  const area = document.getElementById('commentary-area');
+  const tag = document.getElementById('commentary-tag');
+  const bubble = document.getElementById('commentary-bubble');
+  if (mode !== 'online' && mode !== 'local') return;
+  area.style.display = 'block';
+  tag.textContent = personality || '解说';
+  bubble.textContent = text;
+  // 重启动画
+  area.style.animation = 'none';
+  void area.offsetHeight;
+  area.style.animation = 'fadeInUp .4s ease-out';
+  // 8秒后自动隐藏
+  if (commentaryTimer) clearTimeout(commentaryTimer);
+  commentaryTimer = setTimeout(() => { area.style.display = 'none'; }, 8000);
+}
+
 function showOverlay(id) {
   document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
   if (id) document.getElementById(id).classList.remove('hidden');
@@ -597,6 +626,8 @@ function startLocal() {
   showOverlay(null);
   initBoard();
   updateAiButton();
+  // 本地模式也连接 socket，用于 AI 评语
+  connectSocket();
 }
 
 // ═══ 网络 ═══
@@ -663,6 +694,14 @@ function connectSocket() {
         }
       }
       updateUI();
+      // 显示 AI 评语
+      if (data.commentary && data.commentary.text) {
+        showCommentary(data.commentary.personality, data.commentary.text);
+      }
+    });
+
+    socket.on('commentary', (data) => {
+      if (data && data.text) showCommentary(data.personality, data.text);
     });
 
     socket.on('game_restarted', () => { showOverlay(null); initBoard(); aiOn = false; updateAiButton(); });
@@ -889,6 +928,15 @@ function tryPlace(x, y) {
     lastMove = [r, c];
     animateStone(r, c, currentPlayer);
     updateHistory();
+    // 本地模式：请求 AI 评语
+    if (socket && socket.connected && !gameOver) {
+      socket.emit('request_commentary', {
+        board: board,
+        last_move: [r, c],
+        player: currentPlayer,
+        move_count: moveCount,
+      });
+    }
     if (checkWin(r, c, currentPlayer)) {
       gameOver = true;
       winCells = findWinCells(currentPlayer);

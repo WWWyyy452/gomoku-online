@@ -8,6 +8,7 @@ import copy
 random.seed(os.urandom(32))
 import time
 import eventlet
+from ai_chat import get_commentary
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = str(random.randint(10**9, 10**10))
@@ -1288,6 +1289,9 @@ def on_move(data):
 
     print(f"[MOVE] 房间 {rid} 玩家{idx} 落子 ({row},{col})")
 
+    # 生成 AI 趣味评语（异步，不阻塞）
+    commentary = get_commentary(room["board"], (row, col), idx, len(room["moves"]))
+
     # 分别发给每个玩家
     for pid in room["players"]:
         emit(
@@ -1298,6 +1302,7 @@ def on_move(data):
                 "player": idx,
                 "next_turn": next_turn,
                 "result": result,
+                "commentary": commentary,
             },
             to=pid,
         )
@@ -1453,6 +1458,9 @@ def _execute_ai_move(rid):
 
     print(f"[AI] 房间 {rid} AI(玩家{ai_player}) 落子 ({r},{c}) 思考{think_time:.1f}s")
 
+    # AI 落子也生成评语
+    ai_commentary = get_commentary(room["board"], (r, c), ai_player, len(room["moves"]))
+
     for pid in room["players"]:
         socketio.emit(
             "opponent_move",
@@ -1462,9 +1470,26 @@ def _execute_ai_move(rid):
                 "player": ai_player,
                 "next_turn": next_turn,
                 "result": result,
+                "commentary": ai_commentary,
             },
             to=pid,
         )
+
+
+@socketio.on("request_commentary")
+def on_request_commentary(data):
+    """本地双人模式请求 AI 评语"""
+    board_text = data.get("board", [])
+    last_move = data.get("last_move", [0, 0])
+    player = data.get("player", 1)
+    move_count = data.get("move_count", 0)
+
+    if not board_text:
+        return
+
+    commentary = get_commentary(board_text, tuple(last_move), player, move_count)
+    if commentary:
+        emit("commentary", commentary)
 
 
 @socketio.on("toggle_ai")
