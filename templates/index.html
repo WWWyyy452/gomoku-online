@@ -116,7 +116,7 @@ canvas#fx{position:absolute;pointer-events:none;top:50%;left:50%;transform:trans
       </div>
       <div class="spacer" style="flex:1"></div>
       <button class="btn btn-success" id="btn-ai" style="display:none" onclick="toggleAi()">启用AI替我下棋</button>
-      <button class="btn btn-warning" id="btn-commentary" style="display:none" onclick="toggleCommentary()">开启嘲讽</button>
+      <button class="btn btn-warning" id="btn-taunt" style="display:none" onclick="sendTaunt()">发送嘲讽</button>
       <button class="btn btn-primary" id="btn-undo" style="display:none" onclick="doUndo()">悔棋</button>
       <button class="btn btn-secondary" id="btn-back" onclick="backToMenu()">返回菜单</button>
     </div>
@@ -215,8 +215,7 @@ let aiEnabled = false; // AI功能是否可用（隐藏功能）
 let aiOn = false; // AI开关
 let aiPlayer = 0; // AI代表哪个玩家
 let aiThinking = false; // AI是否在思考中
-let commentaryEnabled = false; // 嘲讽功能是否可用
-let commentaryOn = false; // 嘲讽开关
+let tauntAvailable = false; // 嘲讽功能是否可用（创建者昵称st）
 
 // ═══ Canvas ═══
 const canvas = document.getElementById('board');
@@ -559,7 +558,7 @@ function updateHistory() {
 // ═══ AI 嘲讽评语 ═══
 let commentaryTimer = null;
 function showCommentary(text) {
-  if (!text || commentaryOn === false) return;
+  if (!text) return;
   if (mode !== 'online') return;
   const area = document.getElementById('commentary-area');
   const bubble = document.getElementById('commentary-bubble');
@@ -596,8 +595,7 @@ function backFromCreate() {
   aiEnabled = false;
   aiOn = false;
   aiPlayer = 0;
-  commentaryEnabled = false;
-  commentaryOn = false;
+  tauntAvailable = false;
   showMenu();
 }
 function backFromJoin() { showMenu(); }
@@ -614,8 +612,7 @@ function backToMenu() {
   aiEnabled = false;
   aiOn = false;
   aiPlayer = 0;
-  commentaryEnabled = false;
-  commentaryOn = false;
+  tauntAvailable = false;
   document.getElementById('online-info').innerHTML = '';
   showMenu();
   initBoard();
@@ -629,12 +626,11 @@ function startLocal() {
   aiOn = false;
   aiPlayer = 0;
   aiThinking = false;
-  commentaryEnabled = false;
-  commentaryOn = false;
+  tauntAvailable = false;
   showOverlay(null);
   initBoard();
   updateAiButton();
-  updateCommentaryButton();
+  updateTauntButton();
 }
 
 // ═══ 网络 ═══
@@ -663,15 +659,14 @@ function connectSocket() {
       mode = 'online';
       if (data.ai_enabled !== undefined) aiEnabled = data.ai_enabled;
       if (data.ai_player !== undefined) aiPlayer = data.ai_player;
-      commentaryEnabled = !!data.commentary_enabled;
-      commentaryOn = false;
+      tauntAvailable = !!data.taunt_available;
       showOverlay(null);
       initBoard();
       document.getElementById('online-info').innerHTML =
         `你是 ${myPlayer === 1 ? '黑方 ●' : '白方 ○'} · 对手: ${data.opponent || '已连接'}`;
       updateUI();
       updateAiButton();
-      updateCommentaryButton();
+      updateTauntButton();
     });
 
     socket.on('opponent_move', (data) => {
@@ -704,13 +699,9 @@ function connectSocket() {
         }
       }
       updateUI();
-      // 显示 AI 嘲讽评语
-      if (data.commentary && data.commentary.text && commentaryOn) {
-        showCommentary(data.commentary.text);
-      }
     });
 
-    socket.on('game_restarted', () => { showOverlay(null); initBoard(); aiOn = false; commentaryOn = false; updateAiButton(); updateCommentaryButton(); });
+    socket.on('game_restarted', () => { showOverlay(null); initBoard(); aiOn = false; updateAiButton(); });
     socket.on('opponent_left', () => {
       document.getElementById('online-info').innerHTML = '<span class="disconnected">对手已离开</span>';
       gameOver = true;
@@ -744,9 +735,8 @@ function connectSocket() {
       updateAiButton();
     });
 
-    socket.on('commentary_status', (data) => {
-      commentaryOn = !!data.commentary_on;
-      updateCommentaryButton();
+    socket.on('taunt', (data) => {
+      if (data && data.text) showCommentary(data.text);
     });
 
     socket.on('ai_thinking', (data) => {
@@ -852,22 +842,15 @@ function updateAiButton() {
 }
 
 // ═══ 嘲讽控制 ═══
-function toggleCommentary() {
-  if (!roomId || !commentaryEnabled) return;
-  socket.emit('toggle_commentary', {room_id: roomId});
+function sendTaunt() {
+  if (!roomId || !tauntAvailable) return;
+  socket.emit('send_taunt', {room_id: roomId});
 }
 
-function updateCommentaryButton() {
-  const btn = document.getElementById('btn-commentary');
-  if (commentaryEnabled && mode === 'online') {
+function updateTauntButton() {
+  const btn = document.getElementById('btn-taunt');
+  if (tauntAvailable && mode === 'online') {
     btn.style.display = 'block';
-    if (commentaryOn) {
-      btn.textContent = '关闭嘲讽';
-      btn.className = 'btn btn-danger';
-    } else {
-      btn.textContent = '开启嘲讽';
-      btn.className = 'btn btn-warning';
-    }
   } else {
     btn.style.display = 'none';
   }
