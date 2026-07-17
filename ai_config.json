@@ -1,7 +1,7 @@
 {
   "api_base_url": "https://api.longcat.chat/openai/v1",
   "api_key": "",
-  "model": "LongCat-Flash-Chat",
+  "model": "LongCat-2.0",
   "temperature": 0.9,
   "max_tokens": 200,
   "thinking": false,
