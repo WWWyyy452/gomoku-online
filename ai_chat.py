@@ -76,7 +76,7 @@ def generate_commentary(board, last_move, player, move_count, personality_desc):
     if not api_key or api_key == "YOUR_API_KEY_HERE":
         return None
 
-    base_url = config.get("api_base_url", "https://api.longcat.chat/v1").rstrip("/")
+    base_url = config.get("api_base_url", "https://api.longcat.chat/openai").rstrip("/")
     model = config.get("model", "LongCat-Flash-Chat")
     temperature = config.get("temperature", 0.9)
     max_tokens = config.get("max_tokens", 80)
@@ -127,12 +127,16 @@ def generate_commentary(board, last_move, player, move_count, personality_desc):
         with urllib.request.urlopen(req, timeout=10) as resp:
             result = json.loads(resp.read().decode("utf-8"))
 
-        text = (
-            result.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "")
-            .strip()
-        )
+        message = result.get("choices", [{}])[0].get("message", {})
+
+        # 优先取 content，为空则从 reasoning_content 末尾提取（思考型模型）
+        text = message.get("content", "").strip()
+        if not text:
+            reasoning = message.get("reasoning_content", "").strip()
+            if reasoning:
+                # 取 reasoning 最后一句非空行作为评语
+                lines = [l.strip() for l in reasoning.split("\n") if l.strip()]
+                text = lines[-1] if lines else ""
 
         # 清理多余引号和空白
         text = text.strip('"').strip("'").strip()
