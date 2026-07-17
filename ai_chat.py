@@ -76,7 +76,7 @@ def generate_commentary(board, last_move, player, move_count, personality_desc):
     if not api_key or api_key == "YOUR_API_KEY_HERE":
         return None
 
-    base_url = config.get("api_base_url", "https://api.longcat.chat/openai").rstrip("/")
+    base_url = config.get("api_base_url", "https://api.longcat.chat/openai/v1").rstrip("/")
     model = config.get("model", "LongCat-Flash-Chat")
     temperature = config.get("temperature", 0.9)
     max_tokens = config.get("max_tokens", 80)
@@ -111,6 +111,12 @@ def generate_commentary(board, last_move, player, move_count, personality_desc):
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
+
+    # 思考模式配置（false 关闭思考，加快响应）
+    if config.get("thinking", False):
+        payload["thinking"] = {"type": "enabled"}
+    else:
+        payload["thinking"] = {"type": "disabled"}
 
     headers = {
         "Content-Type": "application/json",

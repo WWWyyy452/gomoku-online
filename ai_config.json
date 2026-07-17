@@ -1,9 +1,10 @@
 {
-  "api_base_url": "https://api.longcat.chat/openai",
+  "api_base_url": "https://api.longcat.chat/openai/v1",
   "api_key": "",
   "model": "LongCat-Flash-Chat",
   "temperature": 0.9,
-  "max_tokens": 1000,
+  "max_tokens": 200,
+  "thinking": false,
   "enabled": true,
   "comment_language": "zh",
   "personalities": {
