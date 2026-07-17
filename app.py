@@ -1157,6 +1157,7 @@ def on_create(data=None):
         "roles": {},  # sid -> player_number
         "ai_enabled": ai_enabled,  # 隐藏AI功能
         "ai_on": False,  # AI开关状态
+        "commentary_on": False,  # AI嘲讽开关
         "ai_player": 0,  # AI 代表哪个玩家编号
     }
     rooms[rid]["roles"][sid] = 1  # 创建者暂定为1，等加入后随机
@@ -1235,6 +1236,7 @@ def on_join(data):
             "opponent": p2_name or "对手",
             "ai_enabled": room.get("ai_enabled", False),
             "ai_player": room.get("ai_player", 0),
+            "commentary_enabled": room.get("ai_enabled", False),
         },
         to=p1_sid,
     )
@@ -1289,8 +1291,12 @@ def on_move(data):
 
     print(f"[MOVE] 房间 {rid} 玩家{idx} 落子 ({row},{col})")
 
-    # 生成 AI 趣味评语（异步，不阻塞）
-    commentary = get_commentary(room["board"], (row, col), idx, len(room["moves"]))
+    # 嘲讽功能：仅创建者开启且轮到创建者时生成评语
+    commentary = None
+    creator_sid = room["players"][0] if room["players"] else None
+    is_creator_move = (sid == creator_sid)
+    if room.get("commentary_on") and is_creator_move:
+        commentary = get_commentary(room["board"], (row, col), idx, len(room["moves"]))
 
     # 分别发给每个玩家
     for pid in room["players"]:
@@ -1458,8 +1464,10 @@ def _execute_ai_move(rid):
 
     print(f"[AI] 房间 {rid} AI(玩家{ai_player}) 落子 ({r},{c}) 思考{think_time:.1f}s")
 
-    # AI 落子也生成评语
-    ai_commentary = get_commentary(room["board"], (r, c), ai_player, len(room["moves"]))
+    # 嘲讽功能：仅创建者开启且AI代表创建者时生成评语
+    ai_commentary = None
+    if room.get("commentary_on") and room.get("ai_on"):
+        ai_commentary = get_commentary(room["board"], (r, c), ai_player, len(room["moves"]))
 
     for pid in room["players"]:
         socketio.emit(
@@ -1476,20 +1484,21 @@ def _execute_ai_move(rid):
         )
 
 
-@socketio.on("request_commentary")
-def on_request_commentary(data):
-    """本地双人模式请求 AI 评语"""
-    board_text = data.get("board", [])
-    last_move = data.get("last_move", [0, 0])
-    player = data.get("player", 1)
-    move_count = data.get("move_count", 0)
-
-    if not board_text:
+@socketio.on("toggle_commentary")
+def on_toggle_commentary(data):
+    rid = data.get("room_id", "")
+    sid = request.sid
+    if rid not in rooms:
+        return
+    room = rooms[rid]
+    if not room.get("ai_enabled"):
+        return
+    if sid != room["players"][0]:  # 只有创建者可以切换
         return
 
-    commentary = get_commentary(board_text, tuple(last_move), player, move_count)
-    if commentary:
-        emit("commentary", commentary)
+    room["commentary_on"] = not room.get("commentary_on", False)
+    print(f"[COMMENTARY] 房间 {rid} 嘲讽开关: {'开启' if room['commentary_on'] else '关闭'}")
+    emit("commentary_status", {"commentary_on": room["commentary_on"]}, to=sid)
 
 
 @socketio.on("toggle_ai")
@@ -1528,8 +1537,9 @@ def on_restart(data):
     room["board"] = new_board()
     room["over"] = False
     room["moves"] = []
-    # 重置 AI 开关状态
+    # 重置 AI 和嘲讽开关状态
     room["ai_on"] = False
+    room["commentary_on"] = False
     # 重新随机分配先手
     p1_sid, p2_sid = room["players"][0], room["players"][1]
     order = random.choice([(1, 2), (2, 1)])

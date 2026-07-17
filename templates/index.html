@@ -40,6 +40,7 @@ canvas#fx{position:absolute;pointer-events:none;top:50%;left:50%;transform:trans
 .commentary-tag{display:inline-block;font-size:11px;font-weight:600;color:#fff;background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:2px 10px;border-radius:10px;margin-bottom:6px}
 .commentary-bubble{background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(139,92,246,0.08));border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:10px 12px;font-size:13px;color:#4c3a6e;line-height:1.5;position:relative}
 .commentary-bubble::before{content:'';position:absolute;top:-6px;left:16px;width:10px;height:10px;background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(139,92,246,0.08));border-left:1px solid rgba(99,102,241,0.2);border-top:1px solid rgba(99,102,241,0.2);transform:rotate(45deg)}
+.btn-warning{background:#e8a020;color:#fff}
 @keyframes fadeInUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .btn{display:block;width:100%;padding:11px 0;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;transition:all .15s}
 .btn:active{transform:scale(0.96)}
@@ -107,7 +108,6 @@ canvas#fx{position:absolute;pointer-events:none;top:50%;left:50%;transform:trans
       <div class="move-info" id="move-info">步数: 0</div>
       <div id="online-info" class="online-info"></div>
       <div id="commentary-area" class="commentary-area" style="display:none">
-        <div class="commentary-tag" id="commentary-tag">解说</div>
         <div class="commentary-bubble" id="commentary-bubble"></div>
       </div>
       <div class="history-area" id="history-area" style="display:none">
@@ -116,6 +116,7 @@ canvas#fx{position:absolute;pointer-events:none;top:50%;left:50%;transform:trans
       </div>
       <div class="spacer" style="flex:1"></div>
       <button class="btn btn-success" id="btn-ai" style="display:none" onclick="toggleAi()">启用AI替我下棋</button>
+      <button class="btn btn-warning" id="btn-commentary" style="display:none" onclick="toggleCommentary()">开启嘲讽</button>
       <button class="btn btn-primary" id="btn-undo" style="display:none" onclick="doUndo()">悔棋</button>
       <button class="btn btn-secondary" id="btn-back" onclick="backToMenu()">返回菜单</button>
     </div>
@@ -214,6 +215,8 @@ let aiEnabled = false; // AI功能是否可用（隐藏功能）
 let aiOn = false; // AI开关
 let aiPlayer = 0; // AI代表哪个玩家
 let aiThinking = false; // AI是否在思考中
+let commentaryEnabled = false; // 嘲讽功能是否可用
+let commentaryOn = false; // 嘲讽开关
 
 // ═══ Canvas ═══
 const canvas = document.getElementById('board');
@@ -553,23 +556,22 @@ function updateHistory() {
   list.scrollTop = list.scrollHeight;
 }
 
-// ═══ AI 评语 ═══
+// ═══ AI 嘲讽评语 ═══
 let commentaryTimer = null;
-function showCommentary(personality, text) {
+function showCommentary(text) {
+  if (!text || commentaryOn === false) return;
+  if (mode !== 'online') return;
   const area = document.getElementById('commentary-area');
-  const tag = document.getElementById('commentary-tag');
   const bubble = document.getElementById('commentary-bubble');
-  if (mode !== 'online' && mode !== 'local') return;
   area.style.display = 'block';
-  tag.textContent = personality || '解说';
   bubble.textContent = text;
   // 重启动画
   area.style.animation = 'none';
   void area.offsetHeight;
   area.style.animation = 'fadeInUp .4s ease-out';
-  // 8秒后自动隐藏
+  // 6秒后自动隐藏
   if (commentaryTimer) clearTimeout(commentaryTimer);
-  commentaryTimer = setTimeout(() => { area.style.display = 'none'; }, 8000);
+  commentaryTimer = setTimeout(() => { area.style.display = 'none'; }, 6000);
 }
 
 function showOverlay(id) {
@@ -594,6 +596,8 @@ function backFromCreate() {
   aiEnabled = false;
   aiOn = false;
   aiPlayer = 0;
+  commentaryEnabled = false;
+  commentaryOn = false;
   showMenu();
 }
 function backFromJoin() { showMenu(); }
@@ -610,6 +614,8 @@ function backToMenu() {
   aiEnabled = false;
   aiOn = false;
   aiPlayer = 0;
+  commentaryEnabled = false;
+  commentaryOn = false;
   document.getElementById('online-info').innerHTML = '';
   showMenu();
   initBoard();
@@ -623,11 +629,12 @@ function startLocal() {
   aiOn = false;
   aiPlayer = 0;
   aiThinking = false;
+  commentaryEnabled = false;
+  commentaryOn = false;
   showOverlay(null);
   initBoard();
   updateAiButton();
-  // 本地模式也连接 socket，用于 AI 评语
-  connectSocket();
+  updateCommentaryButton();
 }
 
 // ═══ 网络 ═══
@@ -656,12 +663,15 @@ function connectSocket() {
       mode = 'online';
       if (data.ai_enabled !== undefined) aiEnabled = data.ai_enabled;
       if (data.ai_player !== undefined) aiPlayer = data.ai_player;
+      commentaryEnabled = !!data.commentary_enabled;
+      commentaryOn = false;
       showOverlay(null);
       initBoard();
       document.getElementById('online-info').innerHTML =
         `你是 ${myPlayer === 1 ? '黑方 ●' : '白方 ○'} · 对手: ${data.opponent || '已连接'}`;
       updateUI();
       updateAiButton();
+      updateCommentaryButton();
     });
 
     socket.on('opponent_move', (data) => {
@@ -694,17 +704,13 @@ function connectSocket() {
         }
       }
       updateUI();
-      // 显示 AI 评语
-      if (data.commentary && data.commentary.text) {
-        showCommentary(data.commentary.personality, data.commentary.text);
+      // 显示 AI 嘲讽评语
+      if (data.commentary && data.commentary.text && commentaryOn) {
+        showCommentary(data.commentary.text);
       }
     });
 
-    socket.on('commentary', (data) => {
-      if (data && data.text) showCommentary(data.personality, data.text);
-    });
-
-    socket.on('game_restarted', () => { showOverlay(null); initBoard(); aiOn = false; updateAiButton(); });
+    socket.on('game_restarted', () => { showOverlay(null); initBoard(); aiOn = false; commentaryOn = false; updateAiButton(); updateCommentaryButton(); });
     socket.on('opponent_left', () => {
       document.getElementById('online-info').innerHTML = '<span class="disconnected">对手已离开</span>';
       gameOver = true;
@@ -736,6 +742,11 @@ function connectSocket() {
     socket.on('ai_status', (data) => {
       aiOn = !!data.ai_on;
       updateAiButton();
+    });
+
+    socket.on('commentary_status', (data) => {
+      commentaryOn = !!data.commentary_on;
+      updateCommentaryButton();
     });
 
     socket.on('ai_thinking', (data) => {
@@ -840,6 +851,28 @@ function updateAiButton() {
   }
 }
 
+// ═══ 嘲讽控制 ═══
+function toggleCommentary() {
+  if (!roomId || !commentaryEnabled) return;
+  socket.emit('toggle_commentary', {room_id: roomId});
+}
+
+function updateCommentaryButton() {
+  const btn = document.getElementById('btn-commentary');
+  if (commentaryEnabled && mode === 'online') {
+    btn.style.display = 'block';
+    if (commentaryOn) {
+      btn.textContent = '关闭嘲讽';
+      btn.className = 'btn btn-danger';
+    } else {
+      btn.textContent = '开启嘲讽';
+      btn.className = 'btn btn-warning';
+    }
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
 // ═══ 结果 ═══
 function showResult(title, sub, emoji) {
   document.getElementById('result-title').textContent = title;
@@ -928,15 +961,6 @@ function tryPlace(x, y) {
     lastMove = [r, c];
     animateStone(r, c, currentPlayer);
     updateHistory();
-    // 本地模式：请求 AI 评语
-    if (socket && socket.connected && !gameOver) {
-      socket.emit('request_commentary', {
-        board: board,
-        last_move: [r, c],
-        player: currentPlayer,
-        move_count: moveCount,
-      });
-    }
     if (checkWin(r, c, currentPlayer)) {
       gameOver = true;
       winCells = findWinCells(currentPlayer);
