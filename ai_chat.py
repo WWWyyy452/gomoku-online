@@ -72,7 +72,8 @@ def generate_commentary(board, last_move, player, move_count, personality_desc):
     if not config.get("enabled"):
         return None
 
-    api_key = config.get("api_key", "")
+    # 优先从环境变量读取，其次从配置文件读取
+    api_key = os.environ.get("LONGCAT_API_KEY", "") or config.get("api_key", "")
     if not api_key or api_key == "YOUR_API_KEY_HERE":
         return None
 
