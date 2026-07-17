@@ -15,6 +15,23 @@ CONFIG_PATH = os.path.join(os.path.dirname(__file__), "ai_config.json")
 GRID = 15
 DIRECTIONS = [(0, 1), (1, 0), (1, 1), (1, -1)]
 
+
+def _line_pattern(board, r, c, dr, dc, player):
+    """分析一个方向的棋型，返回 (连续数, 开口数)"""
+    cnt = 1
+    open_ends = 0
+    for s in (1, -1):
+        nr, nc = r + dr * s, c + dc * s
+        found = 0
+        while 0 <= nr < GRID and 0 <= nc < GRID and board[nr][nc] == player:
+            found += 1
+            nr += dr * s
+            nc += dc * s
+        cnt += found
+        if 0 <= nr < GRID and 0 <= nc < GRID and board[nr][nc] == 0:
+            open_ends += 1
+    return cnt, open_ends
+
 # 缓存加载的配置
 _config = None
 
