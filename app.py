@@ -1132,6 +1132,11 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/love")
+def love():
+    return open("/root/love/index.html", encoding="utf-8").read()
+
+
 @socketio.on("create_room")
 def on_create(data=None):
     sid = request.sid
