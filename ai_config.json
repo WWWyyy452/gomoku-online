@@ -3,7 +3,7 @@
   "api_key": "",
   "model": "LongCat-Flash-Chat",
   "temperature": 0.9,
-  "max_tokens": 500,
+  "max_tokens": 1000,
   "enabled": true,
   "comment_language": "zh",
   "personalities": {

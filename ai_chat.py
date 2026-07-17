@@ -125,9 +125,9 @@ def generate_commentary(board, last_move, player, move_count, personality_desc):
             "-H", "Content-Type: application/json",
             "-H", f"Authorization: Bearer {api_key}",
             "-d", json.dumps(payload, ensure_ascii=False),
-            "--max-time", "15",
+            "--max-time", "25",
         ]
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if proc.returncode != 0:
             print(f"[AI-CHAT] curl 失败: {proc.stderr[:100]}")
             return None
