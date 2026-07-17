@@ -1486,17 +1486,20 @@ def on_send_taunt(data):
 
     # 基于最后一步棋生成嘲讽
     last_move = room["moves"][-1]
+    print(f"[TAUNT] 房间 {rid} 玩家{last_move['p']} 落子 ({last_move['r']},{last_move['c']})")
     commentary = get_commentary(
         room["board"],
         (last_move["r"], last_move["c"]),
         last_move["p"],
         len(room["moves"]),
     )
+    print(f"[TAUNT] 生成结果: {commentary}")
 
     if commentary:
         # 只发给对手（非创建者）
         for pid in room["players"]:
             if pid != sid:
+                print(f"[TAUNT] 发送给 {pid[:8]}")
                 emit("taunt", commentary, to=pid)
                 break
 
