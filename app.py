@@ -1496,12 +1496,10 @@ def on_send_taunt(data):
     print(f"[TAUNT] 生成结果: {commentary}")
 
     if commentary:
-        # 只发给对手（非创建者）
+        # 发给所有玩家（包括发送者自己，让发送者知道发了什么）
         for pid in room["players"]:
-            if pid != sid:
-                print(f"[TAUNT] 发送给 {pid[:8]}")
-                emit("taunt", commentary, to=pid)
-                break
+            print(f"[TAUNT] 发送给 {pid[:8]}")
+            emit("taunt", commentary, to=pid)
 
 
 @socketio.on("toggle_ai")

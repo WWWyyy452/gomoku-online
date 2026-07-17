@@ -62,6 +62,43 @@ def get_active_personality(config):
     return active, personalities[active]
 
 
+def _analyze_situation(board, player):
+    """简单分析棋盘局势，返回描述文本"""
+    opponent = 3 - player
+    my_stones = sum(row.count(player) for row in board)
+    opp_stones = sum(row.count(opponent) for row in board)
+
+    # 检查是否有活三/冲四威胁
+    my_threats = 0
+    opp_threats = 0
+    for r in range(GRID):
+        for c in range(GRID):
+            if board[r][c] == 0:
+                for p, cnt in [(player, my_threats), (opponent, opp_threats)]:
+                    for dr, dc in DIRECTIONS:
+                        total, opens = _line_pattern(board, r, c, dr, dc, p)
+                        if total >= 4 and opens >= 1:
+                            if p == player:
+                                my_threats += 1
+                            else:
+                                opp_threats += 1
+
+    parts = []
+    if my_stones > opp_stones:
+        parts.append("我方领先")
+    elif my_stones < opp_stones:
+        parts.append("对方领先")
+    else:
+        parts.append("势均力敌")
+
+    if opp_threats > 0:
+        parts.append(f"对手有{opp_threats}个威胁")
+    if my_threats > 0:
+        parts.append(f"我方有{my_threats}个威胁")
+
+    return "，".join(parts) if parts else "局势胶着"
+
+
 def generate_commentary(board, last_move, player, move_count, personality_desc):
     """
     调用大模型生成一句评语
@@ -95,12 +132,23 @@ def generate_commentary(board, last_move, player, move_count, personality_desc):
     else:
         stage = "收官阶段"
 
+    # 分析局势优劣
+    situation = _analyze_situation(board, player)
+
+    # 构建提示词
     user_msg = (
         f"当前棋盘（{stage}，第{move_count}手）：\n{board_text}\n\n"
         f"刚刚 {player_name} 落子于 ({r},{c})。\n"
+        f"局势：{situation}\n"
         f"请用{personality_desc}\n"
-        f"要求：只输出一句评语，不要解释，不要加引号，20字以内。"
+        f"要求：只输出一句嘲讽，不要解释，不要加引号，15字以内，要有攻击性。"
     )
+
+    # 加入热梗提示
+    if config.get("include_memes", False):
+        meme_prompt = config.get("meme_prompt", "")
+        if meme_prompt:
+            user_msg += f"\n{meme_prompt}"
 
     payload = {
         "model": model,
