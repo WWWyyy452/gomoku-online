@@ -11,6 +11,10 @@ import subprocess
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "ai_config.json")
 
+# 棋盘常量（避免循环导入）
+GRID = 15
+DIRECTIONS = [(0, 1), (1, 0), (1, 1), (1, -1)]
+
 # 缓存加载的配置
 _config = None
 
