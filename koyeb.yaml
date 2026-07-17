@@ -1,0 +1,18 @@
+services:
+  - name: gomoku
+    type: web
+    regions:
+      - was
+    instance_type: nano
+    ports:
+      - port: 8000
+        http: {}
+    routes:
+      - path: /
+    build:
+      type: buildpack
+    run:
+      command: python app.py
+    env:
+      - key: PYTHON_VERSION
+        value: 3.11.11
